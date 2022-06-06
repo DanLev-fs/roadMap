@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="diagramElements">
+    <file>img/sqare.png</file>
+  </qresource>
+</RCC>
