@@ -1,5 +1,21 @@
 <RCC>
-  <qresource prefix="diagramElements">
-    <file>img/sqare.png</file>
+  <qresource prefix="icons">
+    <file>img/underline.png</file>
+    <file>img/textpointer.png</file>
+    <file>img/sendtoback.png</file>
+    <file>img/pointer.png</file>
+    <file>img/linepointer.png</file>
+    <file>img/linecolor.png</file>
+    <file>img/italic.png</file>
+    <file>img/floodfill.png</file>
+    <file>img/delete.png</file>
+    <file>img/bringtofront.png</file>
+    <file>img/bold.png</file>
+  </qresource>
+  <qresource prefix="bg">
+    <file>img/background4.png</file>
+    <file>img/background3.png</file>
+    <file>img/background2.png</file>
+    <file>img/background1.png</file>
   </qresource>
 </RCC>
