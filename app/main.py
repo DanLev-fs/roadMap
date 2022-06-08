@@ -263,9 +263,9 @@ class DiagramScene(QGraphicsScene):
 		cursor.clearSelection()
 		item.setTextCursor(cursor)
 
-		#if item.toPlainText():
-		#	self.removeItem(item)
-		#	item.deleteLater()
+		if item.toPlainText() == "":
+			self.removeItem(item)
+			item.deleteLater()
 
 	def mousePressEvent(self, mouseEvent):
 		if (mouseEvent.button() != Qt.LeftButton):
@@ -361,12 +361,9 @@ class Ui(QtWidgets.QMainWindow):
 		self.buttonGroup.buttonClicked[int].connect(self.buttonGroupClicked)
 
 		layout = QGridLayout()
-		layout.addWidget(self.createCellWidget("Conditional", DiagramItem.Conditional),
-				0, 0)
-		layout.addWidget(self.createCellWidget("Process", DiagramItem.Step), 0,
-				1)
-		layout.addWidget(self.createCellWidget("Input/Output", DiagramItem.Io),
-				1, 0)
+		layout.addWidget(self.createCellWidget("Conditional", DiagramItem.Conditional), 0, 0)
+		layout.addWidget(self.createCellWidget("Process", DiagramItem.Step), 0, 1)
+		layout.addWidget(self.createCellWidget("Input/Output", DiagramItem.Io), 1, 0)
 
 		textButton = QToolButton()
 		textButton.setCheckable(True)
@@ -495,6 +492,7 @@ class Ui(QtWidgets.QMainWindow):
 		self.addToolBar(Qt.LeftToolBarArea, self.colorToolBar)
 		self.addToolBar(Qt.LeftToolBarArea, self.pointerToolbar)
 		self.addToolBar(self.sceneScaleToolBar)
+		self.setContextMenuPolicy(Qt.NoContextMenu)
 
 	def createActions(self):
 		self.toFrontAction = QAction(
@@ -553,7 +551,7 @@ class Ui(QtWidgets.QMainWindow):
 
 	def handleFontChange(self):
 		font = self.fontCombo.currentFont()
-		font.setPointSize(self.fontSizeCombo.currentText().toInt()[0])
+		font.setPointSize(int(self.fontSizeCombo.currentText()))
 		if self.boldAction.isChecked():
 			font.setWeight(QFont.Bold)
 		else:
