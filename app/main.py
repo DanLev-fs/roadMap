@@ -10,11 +10,31 @@ from PyQt5.QtCore import QSize, Qt, QEvent, QRect, QPointF,  QSizeF
 from PyQt5.QtCore import QLineF, QRectF, pyqtSignal
 from PyQt5.QtGui import QPixmap, QPen, QBrush, QPainter, QColor
 from PyQt5.QtGui import QFont, QIcon, QIntValidator, QPainterPath, QPolygonF
+import msgpack
 import forms.resource
 import math
 import forms.mainWindow as mainWindow
 import forms.sizeDialog as sizeDialog
 import sys
+
+class Items():
+	def __init__(self) -> None:
+		self.itemsList = []
+
+	def addItem(self, item, itemType, itemColor) -> None:
+		self.itemsList.append({"%s"%id(item): (item, "item", itemType, itemColor)})
+
+	def addText(self, item, itemText, itemFont, itemSize, itemColor) -> None:
+		self.itemsList.append({"%s"%id(item): (item, "text", itemText, itemFont, itemSize, itemColor)})
+
+	def addArrow(self, item, startItem, endItem, itemColor) -> None:
+		self.itemsList.append({"%s"%id(item): (item, "arrow", startItem, endItem, itemColor)})
+
+	def remove(self, item) -> None:
+		self.itemsList.remove(str(id(item)))
+
+	def get(self) -> list:
+		return self.itemsList
 
 class Arrow(QGraphicsLineItem):
 	def __init__(self, startItem, endItem, parent=None):
@@ -214,9 +234,10 @@ class DiagramScene(QGraphicsScene):
 	textInserted = pyqtSignal(QGraphicsTextItem)
 	itemSelected = pyqtSignal(QGraphicsItem)
 
-	def __init__(self, parent=None):
+	def __init__(self, itemsInterface: Items, parent=None):
 		super(DiagramScene, self).__init__(parent)
 
+		self.itemsInterface = itemsInterface
 		self.myItemMenu = None
 		self.myMode = self.MoveItem
 		self.myItemType = DiagramItem.Step
@@ -276,6 +297,7 @@ class DiagramScene(QGraphicsScene):
 			item.setBrush(self.myItemColor)
 			self.addItem(item)
 			item.setPos(mouseEvent.scenePos())
+			self.itemsInterface.addItem(item, self.myItemType, self.myItemColor)
 			self.itemInserted.emit(item)
 		elif self.myMode == self.InsertLine:
 			self.line = QGraphicsLineItem(QLineF(mouseEvent.scenePos(),
@@ -328,6 +350,7 @@ class DiagramScene(QGraphicsScene):
 				arrow.setZValue(-1000.0)
 				self.addItem(arrow)
 				arrow.updatePosition()
+				self.itemsInterface.addArrow(arrow, id(startItem), id(endItem), self.myLineColor)
 
 		self.line = None
 		super(DiagramScene, self).mouseReleaseEvent(mouseEvent)
@@ -348,12 +371,34 @@ class Ui(QtWidgets.QMainWindow):
 		self.createActions()
 		self.createItems()
 		self.createToolbars()
-		self.scene = DiagramScene()
+		self.Items = Items()
+		self.scene = DiagramScene(self.Items)
 		self.scene.setSceneRect(QRectF(0, 0, 5000, 5000))
 		self.scene.itemInserted.connect(self.itemInserted)
 		self.scene.textInserted.connect(self.textInserted)
 		self.scene.itemSelected.connect(self.itemSelected)
 		self.ui.canvas.setScene(self.scene)
+		self.ui.save.triggered.connect(self.save)
+
+	def save(self):
+		print("save me")
+		lstItems = []
+		for item in self.Items.get():
+			id = list(item.keys())[0]
+			item = list(item.values())[0]
+			if item[1] == "item":
+				pos = [item[0].x(), item[0].y()]
+				itemType = item[2]
+				itemColor = QColor.getRgb(QColor(item[3]))
+				lstItems.append({"%s"%id: (pos, itemType, itemColor)})
+			elif item[1] == "text":
+				pass
+			elif item[1] == "arrow":
+				start = item[2]
+				end = item[3]
+				itemColor = QColor.getRgb(QColor(item[4]))
+				lstItems.append({"%s"%id: (start, end, itemColor)})
+		print(lstItems)
 
 	def createItems(self):
 		self.buttonGroup = QButtonGroup()
