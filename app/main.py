@@ -5,10 +5,10 @@ from PyQt5.QtWidgets import QGraphicsItem, QGraphicsLineItem, QFontComboBox
 from PyQt5.QtWidgets import QButtonGroup, QComboBox, QGraphicsPolygonItem
 from PyQt5.QtWidgets import QGraphicsTextItem, QGridLayout, QHBoxLayout, QLabel
 from PyQt5.QtWidgets import QMenu, QMessageBox, QSizePolicy,QToolBox, QToolButton
-from PyQt5.QtWidgets import QAction, QToolBar, QSpinBox
+from PyQt5.QtWidgets import QAction, QToolBar, QSpinBox, QFileDialog
 from PyQt5.QtCore import QSize, Qt, QEvent, QRect, QPointF,  QSizeF
 from PyQt5.QtCore import QLineF, QRectF, pyqtSignal
-from PyQt5.QtGui import QPixmap, QPen, QBrush, QPainter, QColor
+from PyQt5.QtGui import QPixmap, QPen, QBrush, QPainter, QColor, QImage
 from PyQt5.QtGui import QFont, QIcon, QIntValidator, QPainterPath, QPolygonF
 import msgpack
 import forms.resource
@@ -218,7 +218,7 @@ class DiagramItem(QGraphicsPolygonItem):
 	def contextMenuEvent(self, event):
 		self.scene().clearSelection()
 		self.setSelected(True)
-		self.myContextMenu.exec_(event.screenPos())
+		self.contextMenu.exec_(event.screenPos())
 
 	def itemChange(self, change, value):
 		if change == QGraphicsItem.ItemPositionChange:
@@ -234,11 +234,11 @@ class DiagramScene(QGraphicsScene):
 	textInserted = pyqtSignal(QGraphicsTextItem)
 	itemSelected = pyqtSignal(QGraphicsItem)
 
-	def __init__(self, itemsInterface: Items, parent=None):
+	def __init__(self, itemsInterface: Items, itemMenu, parent=None):
 		super(DiagramScene, self).__init__(parent)
 
 		self.itemsInterface = itemsInterface
-		self.myItemMenu = None
+		self.myItemMenu = itemMenu
 		self.myMode = self.MoveItem
 		self.myItemType = DiagramItem.Step
 		self.line = None
@@ -371,14 +371,45 @@ class Ui(QtWidgets.QMainWindow):
 		self.createActions()
 		self.createItems()
 		self.createToolbars()
+		self.itemMenu()
 		self.Items = Items()
-		self.scene = DiagramScene(self.Items)
+		self.scene = DiagramScene(self.Items, self.ui.itemMenu)
 		self.scene.setSceneRect(QRectF(0, 0, 5000, 5000))
 		self.scene.itemInserted.connect(self.itemInserted)
 		self.scene.textInserted.connect(self.textInserted)
 		self.scene.itemSelected.connect(self.itemSelected)
 		self.ui.canvas.setScene(self.scene)
-		self.ui.save.triggered.connect(self.save)
+		#self.ui.save.triggered.connect(self.save)
+		self.ui.export.triggered.connect(self.exportPNG)
+		self.ui.exit.triggered.connect(self.close)
+
+	def _get_max_min_pos(self):
+		listX = []
+		listY = []
+		for item in self.scene.items():
+			if item.isSelected():
+				item.setSelected(False)
+			listX.append(item.x())
+			listY.append(item.y())
+		topLeft = QPointF(min(listX)-250, max(listY)+250)
+		botomRight = QPointF(max(listX)+250, min(listY)-250)
+		return topLeft, botomRight
+
+	def exportPNG(self):
+		if len(self.scene.items()) == 0:
+			return
+		rect = self._get_max_min_pos()
+		area = QRectF()
+		area.setTopLeft(rect[0])
+		area.setBottomRight(rect[1])
+		area = area.normalized()
+		print(area.getRect())
+		image = QImage(self.scene.sceneRect().size().toSize(), QImage.Format_ARGB32_Premultiplied)
+		painter = QPainter(image)
+		self.scene.render(painter, QRectF(image.rect()), area)
+		painter.end()
+		name = QFileDialog.getSaveFileName(self, 'Save File', 'scene.png', filter="PNG (*.png)")
+		image.save(name[0])
 
 	def save(self):
 		print("save me")
@@ -400,15 +431,21 @@ class Ui(QtWidgets.QMainWindow):
 				lstItems.append({"%s"%id: (start, end, itemColor)})
 		print(lstItems)
 
+	def itemMenu(self):
+		self.ui.itemMenu.addAction(self.deleteAction)
+		self.ui.itemMenu.addSeparator()
+		self.ui.itemMenu.addAction(self.toFrontAction)
+		self.ui.itemMenu.addAction(self.sendBackAction)
+
 	def createItems(self):
 		self.buttonGroup = QButtonGroup()
 		self.buttonGroup.setExclusive(False)
 		self.buttonGroup.buttonClicked[int].connect(self.buttonGroupClicked)
 
 		layout = QGridLayout()
-		layout.addWidget(self.createCellWidget("Conditional", DiagramItem.Conditional), 0, 0)
-		layout.addWidget(self.createCellWidget("Process", DiagramItem.Step), 0, 1)
-		layout.addWidget(self.createCellWidget("Input/Output", DiagramItem.Io), 1, 0)
+		layout.addWidget(self.createCellWidget("Условие", DiagramItem.Conditional), 0, 0)
+		layout.addWidget(self.createCellWidget("Процесс", DiagramItem.Step), 0, 1)
+		layout.addWidget(self.createCellWidget("Ввод/Вывод", DiagramItem.Io), 1, 0)
 
 		textButton = QToolButton()
 		textButton.setCheckable(True)
@@ -418,7 +455,7 @@ class Ui(QtWidgets.QMainWindow):
 
 		textLayout = QGridLayout()
 		textLayout.addWidget(textButton, 0, 0, Qt.AlignHCenter)
-		textLayout.addWidget(QLabel("Text"), 1, 0, Qt.AlignCenter)
+		textLayout.addWidget(QLabel("Текст"), 1, 0, Qt.AlignCenter)
 		textWidget = QWidget()
 		textWidget.setLayout(textLayout)
 		layout.addWidget(textWidget, 1, 1)
@@ -431,7 +468,7 @@ class Ui(QtWidgets.QMainWindow):
 
 		self.ui.toolBox.setSizePolicy(QSizePolicy(QSizePolicy.Maximum, QSizePolicy.Ignored))
 		self.ui.toolBox.setMinimumWidth(itemWidget.sizeHint().width())
-		self.ui.toolBox.addItem(itemWidget, "Items")
+		self.ui.toolBox.addItem(itemWidget, "Предметы")
 
 	def createToolbars(self):
 		self.editToolBar = QToolBar(self)
@@ -541,33 +578,30 @@ class Ui(QtWidgets.QMainWindow):
 
 	def createActions(self):
 		self.toFrontAction = QAction(
-				QIcon(':/icons/img/bringtofront.png'), "Bring to &Front",
-				self, shortcut="Ctrl+F", statusTip="Bring item to front",
+				QIcon(':/icons/img/bringtofront.png'), "На передний план",
+				self, shortcut="Ctrl+F", statusTip="Поместить предмет на передний план",
 				triggered=self.bringToFront)
 
 		self.sendBackAction = QAction(
-				QIcon(':/icons/img/sendtoback.png'), "Send to &Back", self,
-				shortcut="Ctrl+B", statusTip="Send item to back",
+				QIcon(':/icons/img/sendtoback.png'), "На задний план", self,
+				shortcut="Ctrl+B", statusTip="Отправить предмет на задний план",
 				triggered=self.sendToBack)
 
 		self.deleteAction = QAction(QIcon(':/icons/img/delete.png'),
-				"&Delete", self, shortcut="Delete",
-				statusTip="Delete item from diagram",
+				"Удалить", self, shortcut="Delete",
+				statusTip="Удалить элемент с диаграммы",
 				triggered=self.deleteItem)
 
-		self.exitAction = QAction("E&xit", self, shortcut="Ctrl+X",
-				statusTip="Quit Scenediagram example", triggered=self.close)
-
 		self.boldAction = QAction(QIcon(':/icons/img/bold.png'),
-				"Bold", self, checkable=True, shortcut="Ctrl+B",
+				"Жирный шрифт", self, checkable=True, shortcut="Ctrl+B",
 				triggered=self.handleFontChange)
 
 		self.italicAction = QAction(QIcon(':/icons/img/italic.png'),
-				"Italic", self, checkable=True, shortcut="Ctrl+I",
+				"Курсив", self, checkable=True, shortcut="Ctrl+I",
 				triggered=self.handleFontChange)
 
 		self.underlineAction = QAction(
-				QIcon(':/icons/img/underline.png'), "Underline", self,
+				QIcon(':/icons/img/underline.png'), "Подчеркнутый", self,
 				checkable=True, shortcut="Ctrl+U",
 				triggered=self.handleFontChange)
 
