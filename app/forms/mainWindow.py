@@ -71,7 +71,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Диаграммы"))
         self.menu.setTitle(_translate("MainWindow", "Файл"))
         self.create.setText(_translate("MainWindow", "Создать"))
         self.create.setShortcut(_translate("MainWindow", "Ctrl+N"))
