@@ -293,6 +293,15 @@ class DiagramScene(QGraphicsScene):
 		if (mouseEvent.button() != Qt.LeftButton):
 			return
 
+		if mouseEvent.scenePos().x() > self.sceneRect().right():
+			return
+		if mouseEvent.scenePos().x() < self.sceneRect().left():
+			return
+		if mouseEvent.scenePos().y() > self.sceneRect().bottom():
+			return
+		if mouseEvent.scenePos().y() < self.sceneRect().top():
+			return
+
 		if self.myMode == self.InsertItem:
 			item = DiagramItem(self.myItemType, self.myItemMenu)
 			item.setBrush(self.myItemColor)
@@ -324,6 +333,17 @@ class DiagramScene(QGraphicsScene):
 			newLine = QLineF(self.line.line().p1(), mouseEvent.scenePos())
 			self.line.setLine(newLine)
 		elif self.myMode == self.MoveItem:
+			height = self.sceneRect().height()
+			width = self.sceneRect().width()
+			pos = mouseEvent.scenePos()
+			if pos.x() < 0:
+				self.selectedItems()[0].setPos(0, pos.y())
+			elif pos.x() > width:
+				self.selectedItems()[0].setPos(width, pos.y())
+			if pos.y() < 0:
+				self.selectedItems()[0].setPos(pos.x(), 0)
+			elif pos.y() > height:
+				self.selectedItems()[0].setPos(pos.x(), height)
 			super(DiagramScene, self).mouseMoveEvent(mouseEvent)
 
 	def mouseReleaseEvent(self, mouseEvent):
@@ -385,6 +405,13 @@ class Ui(QtWidgets.QMainWindow):
 	def createScene(self, heigth, width):
 		self.scene = DiagramScene(self.Items, self.ui.itemMenu)
 		self.scene.setSceneRect(QRectF(0, 0, heigth, width))
+		pen = QPen()
+		pen.setColor(Qt.black)
+		pen.setWidth(10)
+		self.scene.addLine(0, 0, 0, heigth, pen)
+		self.scene.addLine(0, 0, width, 0, pen)
+		self.scene.addLine(heigth, width, 0, width, pen)
+		self.scene.addLine(heigth, width, width, 0, pen)
 		self.scene.itemInserted.connect(self.itemInserted)
 		self.scene.textInserted.connect(self.textInserted)
 		self.scene.itemSelected.connect(self.itemSelected)
