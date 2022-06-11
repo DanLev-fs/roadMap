@@ -11,6 +11,7 @@ from PyQt5.QtCore import QLineF, QRectF, pyqtSignal
 from PyQt5.QtGui import QPixmap, QPen, QBrush, QPainter, QColor, QImage
 from PyQt5.QtGui import QFont, QIcon, QIntValidator, QPainterPath, QPolygonF
 import msgpack
+import numpy as np
 import forms.resource
 import math
 import forms.mainWindow as mainWindow
@@ -368,25 +369,42 @@ class Ui(QtWidgets.QMainWindow):
 		super(Ui, self).__init__()
 		self.ui = mainWindow.Ui_MainWindow()
 		self.ui.setupUi(self)
+		self.ui.statusbar.showMessage("Здравствуйте")
 		self.createActions()
 		self.createItems()
 		self.createToolbars()
 		self.itemMenu()
 		self.Items = Items()
+		self.createScene(5000, 5000)
+		#self.ui.save.triggered.connect(self.save)
+		self.ui.export.triggered.connect(self.exportPNG)
+		self.ui.exit.triggered.connect(self.close)
+		self.ui.create.triggered.connect(self.createDialog)
+		self.scaleUpFactor = np.sqrt(2.0)
+
+	def createScene(self, heigth, width):
 		self.scene = DiagramScene(self.Items, self.ui.itemMenu)
-		self.scene.setSceneRect(QRectF(0, 0, 5000, 5000))
+		self.scene.setSceneRect(QRectF(0, 0, heigth, width))
 		self.scene.itemInserted.connect(self.itemInserted)
 		self.scene.textInserted.connect(self.textInserted)
 		self.scene.itemSelected.connect(self.itemSelected)
 		self.ui.canvas.setScene(self.scene)
-		#self.ui.save.triggered.connect(self.save)
-		self.ui.export.triggered.connect(self.exportPNG)
-		self.ui.exit.triggered.connect(self.close)
+
+	def createDialog(self):
+		edites = QDialog()
+		ui = sizeDialog.Ui_canvasSize()
+		ui.setupUi(edites)
+		if (edites.exec_() == QDialog.Accepted):
+			heigth = ui.higthBox.value()
+			width = ui.widthBox.value()
+			self.createScene(heigth, width)
 
 	def _get_max_min_pos(self):
 		listX = []
 		listY = []
 		for item in self.scene.items():
+			if item.x() == 0 and item.y() == 0:
+				continue
 			if item.isSelected():
 				item.setSelected(False)
 			listX.append(item.x())
@@ -397,19 +415,20 @@ class Ui(QtWidgets.QMainWindow):
 
 	def exportPNG(self):
 		if len(self.scene.items()) == 0:
+			self.ui.statusbar.showMessage("Ошибка! Пустая диаграмма")
 			return
+		self.ui.statusbar.showMessage("Экпортирую, подождите немного")
 		rect = self._get_max_min_pos()
 		area = QRectF()
 		area.setTopLeft(rect[0])
 		area.setBottomRight(rect[1])
-		area = area.normalized()
-		print(area.getRect())
 		image = QImage(self.scene.sceneRect().size().toSize(), QImage.Format_ARGB32_Premultiplied)
 		painter = QPainter(image)
-		self.scene.render(painter, QRectF(image.rect()), area)
+		self.scene.render(painter, QRectF(image.rect()), area.normalized())
 		painter.end()
-		name = QFileDialog.getSaveFileName(self, 'Save File', 'scene.png', filter="PNG (*.png)")
+		name = QFileDialog.getSaveFileName(self, 'Выберите куда сохранить', 'scene.png', filter="PNG (*.png)")
 		image.save(name[0])
+		self.ui.statusbar.showMessage("Готово, экспорт завершен!")
 
 	def save(self):
 		print("save me")
@@ -466,9 +485,29 @@ class Ui(QtWidgets.QMainWindow):
 		itemWidget = QWidget()
 		itemWidget.setLayout(layout)
 
+		self.backgroundButtonGroup = QButtonGroup()
+		self.backgroundButtonGroup.buttonClicked.connect(self.backgroundButtonGroupClicked)
+
+		backgroundLayout = QGridLayout()
+		backgroundLayout.addWidget(self.createBackgroundCellWidget("Синяя сетка",
+				':/bg/img/background1.png'), 0, 0)
+		backgroundLayout.addWidget(self.createBackgroundCellWidget("Белая сетка",
+				':/bg/img/background2.png'), 0, 1)
+		backgroundLayout.addWidget(self.createBackgroundCellWidget("Серая сетка",
+				':/bg/img/background3.png'), 1, 0)
+		backgroundLayout.addWidget(self.createBackgroundCellWidget("Без сетки",
+				':/bg/img/background4.png'), 1, 1)
+
+		backgroundLayout.setRowStretch(2, 10)
+		backgroundLayout.setColumnStretch(2, 10)
+
+		backgroundWidget = QWidget()
+		backgroundWidget.setLayout(backgroundLayout)
+
 		self.ui.toolBox.setSizePolicy(QSizePolicy(QSizePolicy.Maximum, QSizePolicy.Ignored))
 		self.ui.toolBox.setMinimumWidth(itemWidget.sizeHint().width())
 		self.ui.toolBox.addItem(itemWidget, "Предметы")
+		self.ui.toolBox.addItem(backgroundWidget, "Фон")
 
 	def createToolbars(self):
 		self.editToolBar = QToolBar(self)
@@ -479,6 +518,7 @@ class Ui(QtWidgets.QMainWindow):
 
 		self.fontCombo = QFontComboBox()
 		self.fontCombo.currentFontChanged.connect(self.currentFontChanged)
+		self.fontCombo.setStatusTip("Шрифт")
 
 		self.fontSizeCombo = QComboBox()
 		self.fontSizeCombo.setEditable(True)
@@ -487,11 +527,14 @@ class Ui(QtWidgets.QMainWindow):
 		validator = QIntValidator(2, 64, self)
 		self.fontSizeCombo.setValidator(validator)
 		self.fontSizeCombo.currentIndexChanged.connect(self.fontSizeChanged)
+		self.fontSizeCombo.setStatusTip("Размер шрифта")
 
 		self.fontColorToolButton = QToolButton()
 		self.fontColorToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 		self.fontColorToolButton.setMenu(
 				self.createColorMenu(self.textColorChanged, Qt.black))
+		self.fontColorToolButton.setStatusTip("Цвет текста")
+
 		self.textAction = self.fontColorToolButton.menu().defaultAction()
 		self.fontColorToolButton.setIcon(
 				self.createColorToolButtonIcon(':/icons/img/textpointer.png',
@@ -508,6 +551,7 @@ class Ui(QtWidgets.QMainWindow):
 				self.createColorToolButtonIcon(':/icons/img/floodfill.png',
 						Qt.white))
 		self.fillColorToolButton.clicked.connect(self.fillButtonTriggered)
+		self.fillColorToolButton.setStatusTip("Цвет предметов")
 
 		self.lineColorToolButton = QToolButton()
 		self.lineColorToolButton.setPopupMode(QToolButton.MenuButtonPopup)
@@ -518,6 +562,7 @@ class Ui(QtWidgets.QMainWindow):
 				self.createColorToolButtonIcon(':/icons/img/linecolor.png',
 						Qt.black))
 		self.lineColorToolButton.clicked.connect(self.lineButtonTriggered)
+		self.lineColorToolButton.setStatusTip("Цвет стрелки")
 
 		self.textToolBar = QToolBar(self)
 		self.textToolBar.setObjectName("Font")
@@ -537,9 +582,11 @@ class Ui(QtWidgets.QMainWindow):
 		pointerButton.setCheckable(True)
 		pointerButton.setChecked(True)
 		pointerButton.setIcon(QIcon(':/icons/img/pointer.png'))
+		pointerButton.setStatusTip("Курсор")
 		linePointerButton = QToolButton()
 		linePointerButton.setCheckable(True)
 		linePointerButton.setIcon(QIcon(':/icons/img/linepointer.png'))
+		linePointerButton.setStatusTip("Стрелка")
 
 		self.pointerTypeGroup = QButtonGroup()
 		self.pointerTypeGroup.addButton(pointerButton, DiagramScene.MoveItem)
@@ -555,17 +602,14 @@ class Ui(QtWidgets.QMainWindow):
 		sceneScalePlus = QToolButton()
 		sceneScalePlus.setText("+")
 		sceneScalePlus.clicked.connect(self.sceneScalePlus)
-		self.sceneScaleBox = QSpinBox()
-		self.sceneScaleBox.setMaximum(200)
-		self.sceneScaleBox.setMinimum(50)
-		self.sceneScaleBox.setValue(100)
+		sceneScalePlus.setStatusTip("Увеличить диаграмму")
 		sceneScaleMinus = QToolButton()
 		sceneScaleMinus.setText("-")
 		sceneScaleMinus.clicked.connect(self.sceneScaleMinus)
+		sceneScaleMinus.setStatusTip("Уменьшить диаграмму")
 
 		self.sceneScaleToolBar = QToolBar()
 		self.sceneScaleToolBar.setObjectName("Scale")
-		self.sceneScaleToolBar.addWidget(self.sceneScaleBox)
 		self.sceneScaleToolBar.addWidget(sceneScalePlus)
 		self.sceneScaleToolBar.addWidget(sceneScaleMinus)
 
@@ -594,15 +638,15 @@ class Ui(QtWidgets.QMainWindow):
 
 		self.boldAction = QAction(QIcon(':/icons/img/bold.png'),
 				"Жирный шрифт", self, checkable=True, shortcut="Ctrl+B",
-				triggered=self.handleFontChange)
+				statusTip="Жирный шрифт", triggered=self.handleFontChange)
 
 		self.italicAction = QAction(QIcon(':/icons/img/italic.png'),
 				"Курсив", self, checkable=True, shortcut="Ctrl+I",
-				triggered=self.handleFontChange)
+				statusTip="Курсив", triggered=self.handleFontChange)
 
 		self.underlineAction = QAction(
 				QIcon(':/icons/img/underline.png'), "Подчеркнутый", self,
-				checkable=True, shortcut="Ctrl+U",
+				checkable=True, shortcut="Ctrl+U", statusTip="Подчеркнутый",
 				triggered=self.handleFontChange)
 
 	def createColorMenu(self, slot, defaultColor):
@@ -618,6 +662,42 @@ class Ui(QtWidgets.QMainWindow):
 			if color == defaultColor:
 				colorMenu.setDefaultAction(action)
 		return colorMenu
+
+	def createBackgroundCellWidget(self, text, image):
+		button = QToolButton()
+		button.setText(text)
+		button.setIcon(QIcon(image))
+		button.setIconSize(QSize(50, 50))
+		button.setCheckable(True)
+		self.backgroundButtonGroup.addButton(button)
+
+		layout = QGridLayout()
+		layout.addWidget(button, 0, 0, Qt.AlignHCenter)
+		layout.addWidget(QLabel(text), 1, 0, Qt.AlignCenter)
+
+		widget = QWidget()
+		widget.setLayout(layout)
+
+		return widget
+
+	def createCellWidget(self, text, diagramType):
+		item = DiagramItem(diagramType, self.itemMenu)
+		icon = QIcon(item.image())
+
+		button = QToolButton()
+		button.setIcon(icon)
+		button.setIconSize(QSize(50, 50))
+		button.setCheckable(True)
+		self.buttonGroup.addButton(button, diagramType)
+
+		layout = QGridLayout()
+		layout.addWidget(button, 0, 0, Qt.AlignHCenter)
+		layout.addWidget(QLabel(text), 1, 0, Qt.AlignCenter)
+
+		widget = QWidget()
+		widget.setLayout(layout)
+
+		return widget
 
 	def createColorIcon(self, color):
 		pixmap = QPixmap(20, 20)
@@ -646,20 +726,11 @@ class Ui(QtWidgets.QMainWindow):
 				item.removeArrows()
 			self.scene.removeItem(item)
 
-	def sceneScale(self, scaleValue, value):
-		if value in range(50, 201):
-			self.sceneScaleBox.setValue(value)
-			self.ui.canvas.scale(scaleValue, scaleValue)
-
 	def sceneScalePlus(self):
-		value = self.sceneScaleBox.value()
-		value += 25
-		self.sceneScale(1.25, value)
+		self.ui.canvas.scale(self.scaleUpFactor, self.scaleUpFactor)
 	
 	def sceneScaleMinus(self):
-		value = self.sceneScaleBox.value()
-		value -= 25
-		self.sceneScale(0.75, value)
+		self.ui.canvas.scale(1.0/self.scaleUpFactor, 1.0/self.scaleUpFactor)
 	
 	def pointerGroupClicked(self, i):
 		self.scene.setMode(self.pointerTypeGroup.checkedId())
@@ -787,6 +858,25 @@ class Ui(QtWidgets.QMainWindow):
 		painter.end()
 
 		return QIcon(pixmap)
+
+	def backgroundButtonGroupClicked(self, button):
+		buttons = self.backgroundButtonGroup.buttons()
+		for buttonL in buttons:
+			if buttonL != button:
+				buttonL.setChecked(False)
+
+		text = button.text()
+		if text == "Синяя сетка":
+			self.scene.setBackgroundBrush(QBrush(QPixmap(':/bg/img/background1.png')))
+		elif text == "Белая сетка":
+			self.scene.setBackgroundBrush(QBrush(QPixmap(':/bg/img/background2.png')))
+		elif text == "Серая сетка":
+			self.scene.setBackgroundBrush(QBrush(QPixmap(':/bg/img/background3.png')))
+		else:
+			self.scene.setBackgroundBrush(QBrush(QPixmap(':/bg/img/background4.png')))
+
+		self.scene.update()
+		self.ui.canvas.update()
 
 if __name__ == "__main__":
 	app = QApplication(sys.argv)
