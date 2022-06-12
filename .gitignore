@@ -4,6 +4,7 @@ __pycache__
 **/__pycache__
 *.bak
 *.png
+*.zip
 
 # Distribution / packaging 
 .Python build/ 
